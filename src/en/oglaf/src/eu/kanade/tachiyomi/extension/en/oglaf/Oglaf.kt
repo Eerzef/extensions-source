@@ -1,4 +1,4 @@
-package eu.kanade.tachiyomi.extension.en.oglaf
+package eu.kanade.tachiyomi.extension.en.smbc
 
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.source.model.FilterList
@@ -13,12 +13,14 @@ import okhttp3.Response
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import rx.Observable
+import java.text.SimpleDateFormat
+import java.util.Locale
 
-class Oglaf : ParsedHttpSource() {
+class SMBC : ParsedHttpSource() {
 
-    override val name = "Oglaf"
+    override val name = "SMBC Comics"
 
-    override val baseUrl = "https://www.oglaf.com"
+    override val baseUrl = "https://www.smbc-comics.com"
 
     override val lang = "en"
 
@@ -26,13 +28,13 @@ class Oglaf : ParsedHttpSource() {
 
     override fun fetchPopularManga(page: Int): Observable<MangasPage> {
         val manga = SManga.create().apply {
-            title = "Oglaf"
-            artist = "Trudy Cooper & Doug Bayne"
-            author = "Trudy Cooper & Doug Bayne"
+            title = "SMBC Comics"
+            artist = "Zach Weinersmith"
+            author = "Zach Weinersmith"
             status = SManga.ONGOING
-            url = "/archive/"
-            description = "Filth and other Fantastical Things in handy webcomic form."
-            thumbnail_url = "https://i.ibb.co/tzY0VQ9/oglaf.png"
+            url = "/archive"
+            description = "Saturday Morning Breakfast Cereal (SMBC) is a daily comic strip about science, philosophy, relationships, and other weighty matters."
+            thumbnail_url = "https://www.smbc-comics.com/comics/20080101.gif" // Using a default comic as thumbnail
         }
 
         return Observable.just(MangasPage(arrayListOf(manga), false))
@@ -43,36 +45,56 @@ class Oglaf : ParsedHttpSource() {
     override fun fetchMangaDetails(manga: SManga): Observable<SManga> = Observable.just(manga)
 
     override fun chapterListParse(response: Response): List<SChapter> {
-        val chapterList = super.chapterListParse(response).distinct()
-        return chapterList.mapIndexed {
-                i, ch ->
-            ch.apply { chapter_number = chapterList.size.toFloat() - i }
+        val document = response.asJsoup()
+        val elements = document.select(chapterListSelector())
+        val chapters = mutableListOf<SChapter>()
+
+        for (element in elements) {
+            val chapter = chapterFromElement(element)
+            chapters.add(chapter)
+        }
+
+        // Reverse the list so newest chapters come first, and set chapter numbers
+        return chapters.asReversed().mapIndexed { i, chapter ->
+            chapter.apply { chapter_number = chapters.size.toFloat() - i }
         }
     }
 
-    override fun chapterListSelector() = "a:has(img[width=400])"
+    override fun chapterListSelector() = "div#archives a"
 
     override fun chapterFromElement(element: Element): SChapter {
-        val nameRegex =
-            """/(.*)/""".toRegex()
-        val chapter = SChapter.create()
-        chapter.url = element.attr("href")
-        chapter.name = nameRegex.find(element.attr("href"))!!.groupValues[1]
-        return chapter
+        val urlText = element.attr("href")
+        val dateText = element.text().trim()
+
+        return SChapter.create().apply {
+            url = urlText
+            name = "Comic for $dateText"
+
+            // Try to parse the date if possible
+            try {
+                val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                date_upload = dateFormat.parse(dateText)?.time ?: 0L
+            } catch (e: Exception) {
+                // If date parsing fails, just use 0
+                date_upload = 0L
+            }
+        }
     }
 
     override fun pageListParse(document: Document): List<Page> {
-        val urlRegex =
-            """/.*/\d*/""".toRegex()
         val pages = mutableListOf<Page>()
 
-        fun addPage(document: Document) {
-            pages.add(Page(pages.size, "", document.select("img#strip").attr("abs:src")))
-            val next = document.select("a[rel=next]").attr("href")
-            if (urlRegex.matches(next)) addPage(client.newCall(GET(baseUrl + next, headers)).execute().asJsoup())
+        // Main comic image
+        val mainImage = document.select("img#cc-comic").first()
+        if (mainImage != null) {
+            pages.add(Page(0, "", mainImage.attr("abs:src")))
         }
 
-        addPage(document)
+        // After-comic/bonus panel if exists
+        val bonusPanel = document.select("div#aftercomic img").first()
+        if (bonusPanel != null) {
+            pages.add(Page(1, "", bonusPanel.attr("abs:src")))
+        }
 
         return pages
     }
