@@ -1,6 +1,7 @@
+
 ext {
     extName = 'smbc'
-    extClass = '.SMBC'
+    extClass = '.smbc'
     extVersionCode = 1
     isNsfw = false
 }
