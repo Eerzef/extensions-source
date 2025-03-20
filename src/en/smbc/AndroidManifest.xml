@@ -7,12 +7,14 @@
             android:excludeFromRecents="true"
             android:exported="true"
             android:theme="@android:style/Theme.NoDisplay">
+                android:name=".SMBCIntentReceiver"
+                android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
 
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-
+                <action android:name="eu.kanade.tachiyomi.EXTENSION" />
                 <data
                     android:host="www.smbc-comics.com"
                     android:scheme="https" />
@@ -21,5 +23,20 @@
                     android:scheme="https" />
             </intent-filter>
         </activity>
+        <meta-data
+            android:name="tachiyomi.extension.apiVersion"
+            android:value="1.4" />
+        <meta-data
+            android:name="tachiyomi.extension.class"
+            android:value=".SMBC" />
+        <meta-data
+            android:name="tachiyomi.extension.name"
+            android:value="SMBC Comics" />
+        <meta-data
+            android:name="tachiyomi.extension.lang"
+            android:value="en" />
+        <meta-data
+            android:name="tachiyomi.extension.versionCode"
+            android:value="1" />
     </application>
 </manifest>
